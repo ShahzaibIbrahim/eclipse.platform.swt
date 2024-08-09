@@ -1008,28 +1008,31 @@ public void setText (String string) {
 	super.setText (string);
 	long hHeap = OS.GetProcessHeap ();
 	long pszText = 0;
-	MENUITEMINFO info = new MENUITEMINFO ();
-	info.cbSize = MENUITEMINFO.sizeof;
-	long hMenu = parent.handle;
 
-	TCHAR buffer = new TCHAR (0, string, true);
-	int byteCount = buffer.length () * TCHAR.sizeof;
-	pszText = OS.HeapAlloc (hHeap, OS.HEAP_ZERO_MEMORY, byteCount);
-	OS.MoveMemory (pszText, buffer, byteCount);
-	/*
-	* Bug in Windows 2000.  For some reason, when MIIM_TYPE is set
-	* on a menu item that also has MIIM_BITMAP, the MIIM_TYPE clears
-	* the MIIM_BITMAP style.  The fix is to use MIIM_STRING.
-	*/
-	info.fMask = OS.MIIM_STRING;
-	info.dwTypeData = pszText;
-	boolean success = OS.SetMenuItemInfo (hMenu, id, false, info);
-	if (pszText != 0) OS.HeapFree (hHeap, 0, pszText);
-	if (!success) {
-		int error = OS.GetLastError();
-		SWT.error (SWT.ERROR_CANNOT_SET_TEXT, null, " [GetLastError=0x" + Integer.toHexString(error) + "]");//$NON-NLS-1$ $NON-NLS-2$
+	if(!parent.needsMenuCallback()) {
+		MENUITEMINFO info = new MENUITEMINFO ();
+		info.cbSize = MENUITEMINFO.sizeof;
+		long hMenu = parent.handle;
+
+		TCHAR buffer = new TCHAR (0, string, true);
+		int byteCount = buffer.length () * TCHAR.sizeof;
+		pszText = OS.HeapAlloc (hHeap, OS.HEAP_ZERO_MEMORY, byteCount);
+		OS.MoveMemory (pszText, buffer, byteCount);
+		/*
+		* Bug in Windows 2000.  For some reason, when MIIM_TYPE is set
+		* on a menu item that also has MIIM_BITMAP, the MIIM_TYPE clears
+		* the MIIM_BITMAP style.  The fix is to use MIIM_STRING.
+		*/
+		info.fMask = OS.MIIM_STRING;
+		info.dwTypeData = pszText;
+		boolean success = OS.SetMenuItemInfo (hMenu, id, false, info);
+		if (pszText != 0) OS.HeapFree (hHeap, 0, pszText);
+		if (!success) {
+			int error = OS.GetLastError();
+			SWT.error (SWT.ERROR_CANNOT_SET_TEXT, null, " [GetLastError=0x" + Integer.toHexString(error) + "]");//$NON-NLS-1$ $NON-NLS-2$
+		}
+		parent.redraw ();
 	}
-	parent.redraw ();
 }
 
 /**
@@ -1121,27 +1124,43 @@ LRESULT wmCommandChild (long wParam, long lParam) {
 	return null;
 }
 
-LRESULT wmDrawChild (long wParam, long lParam) {
-	DRAWITEMSTRUCT struct = new DRAWITEMSTRUCT ();
-	OS.MoveMemory (struct, lParam, DRAWITEMSTRUCT.sizeof);
-	if (image != null) {
+LRESULT wmDrawChild(long wParam, long lParam) {
+	DRAWITEMSTRUCT struct = new DRAWITEMSTRUCT();
+	OS.MoveMemory(struct, lParam, DRAWITEMSTRUCT.sizeof);
+
+	if (text != null || image != null) {
 		GCData data = new GCData();
 		data.device = display;
 		GC gc = createNewGC(struct.hDC, data);
-		/*
-		* Bug in Windows.  When a bitmap is included in the
-		* menu bar, the HDC seems to already include the left
-		* coordinate.  The fix is to ignore this value when
-		* the item is in a menu bar.
-		*/
-		int x = (parent.style & SWT.BAR) != 0 ? MARGIN_WIDTH * 2 : struct.left;
-		Image image = getEnabled () ? this.image : new Image (display, this.image, SWT.IMAGE_DISABLE);
+
+		int x = (parent.style & SWT.BAR) == 0 ? MARGIN_WIDTH * 2 : struct.left;
+		System.out.println("struct.left : "+ struct.left);
 		int zoom = getZoom();
-		gc.drawImage (image, DPIUtil.scaleDown(x, zoom), DPIUtil.scaleDown(struct.top + MARGIN_HEIGHT, zoom));
-		if (this.image != image) image.dispose ();
-		gc.dispose ();
+		if (text != null) {
+			int flags = SWT.DRAW_MNEMONIC | SWT.DRAW_DELIMITER;
+			boolean isInactive = ((struct.itemState & OS.ODS_INACTIVE) != 0);
+			  Color color = display.getSystemColor(SWT.COLOR_WHITE);
+			  if(isInactive) {
+				  color = display.getSystemColor(SWT.COLOR_GRAY);
+			  }
+			gc.setForeground(color);
+			gc.setBackground(parent.getBackground());
+			gc.drawText(this.text, DPIUtil.scaleDown(x , zoom), DPIUtil.scaleDown(struct.top + MARGIN_HEIGHT, zoom), flags);
+		}
+		if (image != null) {
+			/*
+			 * Bug in Windows. When a bitmap is included in the menu bar, the HDC seems to
+			 * already include the left coordinate. The fix is to ignore this value when the
+			 * item is in a menu bar.
+			 */
+			Image image = getEnabled() ? this.image : new Image(display, this.image, SWT.IMAGE_DISABLE);
+			gc.drawImage(image, DPIUtil.scaleDown(x, zoom), DPIUtil.scaleDown(struct.top + MARGIN_HEIGHT, zoom));
+			if (this.image != image)
+				image.dispose();
+		}
+		gc.dispose();
 	}
-	if (parent.foreground != -1) OS.SetTextColor (struct.hDC, parent.foreground);
+	if (parent.foreground != -1) OS.SetTextColor(struct.hDC, parent.foreground);
 	return null;
 }
 
@@ -1151,6 +1170,9 @@ LRESULT wmMeasureChild (long wParam, long lParam) {
 
 	if ((parent.style & SWT.BAR) != 0) {
 		if (parent.needsMenuCallback()) {
+			GC gc = new GC (display);
+			Point points = gc.textExtent(getText());
+			gc.dispose ();
 			/*
 			 * Weirdness in Windows. Setting `HBMMENU_CALLBACK` causes
 			 * item sizes to mean something else. It seems that it is
@@ -1161,7 +1183,8 @@ LRESULT wmMeasureChild (long wParam, long lParam) {
 			 * NOTE: autoScaleUpUsingNativeDPI() is used to avoid problems
 			 * with applications that disable automatic scaling.
 			 */
-			struct.itemWidth = DPIUtil.scaleUp(5, nativeZoom);
+			struct.itemHeight = DPIUtil.scaleUp(points.y, nativeZoom);
+			struct.itemWidth = DPIUtil.scaleUp(points.x, nativeZoom);
 			OS.MoveMemory (lParam, struct, MEASUREITEMSTRUCT.sizeof);
 			return null;
 		}
