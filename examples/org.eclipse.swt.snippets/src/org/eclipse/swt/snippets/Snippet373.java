@@ -49,6 +49,9 @@ public class Snippet373 {
 	static final ImageFileNameProvider filenameProvider = zoom -> {
 		String path = null;
 		switch (zoom) {
+		case 100:
+			path = IMAGE_PATH_100;
+			break;
 		case 150:
 			path = IMAGE_PATH_150;
 			break;
@@ -56,7 +59,7 @@ public class Snippet373 {
 			path = IMAGE_PATH_200;
 			break;
 		default:
-			path = IMAGE_PATH_100;
+			path = null;
 		}
 		return path;
 	};
@@ -109,6 +112,61 @@ public class Snippet373 {
 		fileItem.setMenu(submenu);
 		MenuItem subItem = new MenuItem(submenu, SWT.PUSH);
 		subItem.addListener(SWT.Selection, e -> System.out.println("Select All"));
+		subItem.setText("Select &All\tCtrl+A");
+		subItem.setAccelerator(SWT.MOD1 + 'A');
+		subItem.setImage(eclipse);
+
+		fileItem = new MenuItem(bar, SWT.CASCADE);
+		fileItem.setText("&File");
+		fileItem.setImage(eclipse);
+		submenu = new Menu(shell, SWT.DROP_DOWN);
+		fileItem.setMenu(submenu);
+		subItem = new MenuItem(submenu, SWT.PUSH);
+		subItem.addListener(SWT.Selection, e -> System.out.println("Item 1"));
+		subItem.setText("Select &All\tCtrl+A");
+		subItem.setAccelerator(SWT.MOD1 + 'A');
+		subItem.setImage(eclipse);
+
+		fileItem = new MenuItem(bar, SWT.CASCADE);
+		fileItem.setText("&File");
+		fileItem.setImage(eclipse);
+		submenu = new Menu(shell, SWT.DROP_DOWN);
+		fileItem.setMenu(submenu);
+		subItem = new MenuItem(submenu, SWT.PUSH);
+		subItem.addListener(SWT.Selection, e -> System.out.println("Item 2"));
+		subItem.setText("Select &All\tCtrl+A");
+		subItem.setAccelerator(SWT.MOD1 + 'A');
+		subItem.setImage(eclipse);
+
+		fileItem = new MenuItem(bar, SWT.CASCADE);
+		fileItem.setText("&File");
+		fileItem.setImage(eclipse);
+		submenu = new Menu(shell, SWT.DROP_DOWN);
+		fileItem.setMenu(submenu);
+		subItem = new MenuItem(submenu, SWT.PUSH);
+		subItem.addListener(SWT.Selection, e -> System.out.println("Item 3"));
+		subItem.setText("Select &All\tCtrl+A");
+		subItem.setAccelerator(SWT.MOD1 + 'A');
+		subItem.setImage(eclipse);
+
+		fileItem = new MenuItem(bar, SWT.CASCADE);
+		fileItem.setText("&File");
+		fileItem.setImage(eclipse);
+		submenu = new Menu(shell, SWT.DROP_DOWN);
+		fileItem.setMenu(submenu);
+		subItem = new MenuItem(submenu, SWT.PUSH);
+		subItem.addListener(SWT.Selection, e -> System.out.println("Item 4"));
+		subItem.setText("Select &All\tCtrl+A");
+		subItem.setAccelerator(SWT.MOD1 + 'A');
+		subItem.setImage(eclipse);
+
+		fileItem = new MenuItem(bar, SWT.CASCADE);
+		fileItem.setText("&File");
+		fileItem.setImage(eclipse);
+		submenu = new Menu(shell, SWT.DROP_DOWN);
+		fileItem.setMenu(submenu);
+		subItem = new MenuItem(submenu, SWT.PUSH);
+		subItem.addListener(SWT.Selection, e -> System.out.println("Item 5"));
 		subItem.setText("Select &All\tCtrl+A");
 		subItem.setAccelerator(SWT.MOD1 + 'A');
 		subItem.setImage(eclipse);
