@@ -185,6 +185,7 @@ void drawItem (GC gc, long hTheme, RECT clipRect, boolean drawFocus) {
 	long hDC = gc.handle;
 	int headerHeight = parent.getBandHeight ();
 	RECT rect = new RECT ();
+	scaleFonts(gc);
 	OS.SetRect (rect, x, y, x + width, y + headerHeight);
 	if (hTheme != 0) {
 		OS.DrawThemeBackground (hTheme, hDC, OS.EBP_NORMALGROUPHEAD, 0, rect, clipRect);
@@ -192,7 +193,7 @@ void drawItem (GC gc, long hTheme, RECT clipRect, boolean drawFocus) {
 		long oldBrush = OS.SelectObject (hDC, OS.GetSysColorBrush (OS.COLOR_BTNFACE));
 		OS.PatBlt (hDC, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, OS.PATCOPY);
 		OS.SelectObject (hDC, oldBrush);
-	}
+	}/*
 	if (image != null) {
 		int zoom = getZoom();
 		rect.left += ExpandItem.TEXT_INSET;
@@ -202,7 +203,7 @@ void drawItem (GC gc, long hTheme, RECT clipRect, boolean drawFocus) {
 			gc.drawImage (image, DPIUtil.scaleDown(rect.left, zoom), DPIUtil.scaleDown(rect.top + (headerHeight - imageHeight) / 2, zoom));
 		}
 		rect.left += imageWidth;
-	}
+	}*/
 	if (text.length () > 0) {
 		rect.left += ExpandItem.TEXT_INSET;
 		char [] buffer;
@@ -254,6 +255,23 @@ void drawItem (GC gc, long hTheme, RECT clipRect, boolean drawFocus) {
 			OS.DeleteObject (pen);
 		}
 	}
+}
+
+private void scaleFonts(GC gc) {
+	int zoom = getZoom();
+	Font originalFont = gc.getFont();
+    FontData[] fontData = originalFont.getFontData();
+
+    for (FontData fd : fontData) {
+        fd.setHeight((int) (fd.getHeight() * zoom / 100.0));
+    }
+
+    Font zoomedFont = new Font(display, fontData);
+    gc.setFont(zoomedFont);
+
+    Font newFont = gc.getFont();
+    FontData[] newFontData = newFont.getFontData();
+   System.out.println("zoomedFont : " + newFontData[0].getHeight());
 }
 
 @Override
