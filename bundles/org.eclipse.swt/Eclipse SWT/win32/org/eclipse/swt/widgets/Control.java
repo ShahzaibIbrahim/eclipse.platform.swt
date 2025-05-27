@@ -80,6 +80,7 @@ public abstract class Control extends Widget implements Drawable {
 	Image backgroundImage;
 	Region region;
 	Font font;
+	private int xInPixels, yInPixels;
 	int drawCount, foreground, background, backgroundAlpha = 255;
 
 /**
@@ -3516,14 +3517,16 @@ public void setLayoutData (Object layoutData) {
 public void setLocation (int x, int y) {
 	checkWidget ();
 	int zoom = getZoom();
-	x = DPIUtil.scaleUp(x, zoom);
-	y = DPIUtil.scaleUp(y, zoom);
-	setLocationInPixels(x, y);
+	this.xInPixels = DPIUtil.scaleUp(x, zoom);
+	this.yInPixels = DPIUtil.scaleUp(y, zoom);
+	setLocationInPixels(this.xInPixels, this.yInPixels);
 }
 
 void setLocationInPixels (int x, int y) {
 	int flags = OS.SWP_NOSIZE | OS.SWP_NOZORDER | OS.SWP_NOACTIVATE | OS.SWP_DRAWFRAME;
 	setBoundsInPixels (x, y, 0, 0, flags);
+	this.xInPixels = x;
+	this.yInPixels = y;
 }
 
 /**
@@ -3781,6 +3784,7 @@ public void setSize (int width, int height) {
 void setSizeInPixels (int width, int height) {
 	int flags = OS.SWP_NOMOVE | OS.SWP_NOZORDER | OS.SWP_DRAWFRAME | OS.SWP_NOACTIVATE;
 	setBoundsInPixels (0, 0, Math.max (0, width), Math.max (0, height), flags);
+	setLocationInPixels(Math.max (0, this.xInPixels), Math.max (0, this.yInPixels));
 }
 
 /**
