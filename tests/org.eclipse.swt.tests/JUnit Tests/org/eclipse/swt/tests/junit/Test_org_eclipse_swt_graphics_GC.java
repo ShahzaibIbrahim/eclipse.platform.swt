@@ -37,6 +37,7 @@ import org.eclipse.swt.graphics.FontMetrics;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
+import org.eclipse.swt.graphics.ImageGcDrawer;
 import org.eclipse.swt.graphics.LineAttributes;
 import org.eclipse.swt.graphics.PaletteData;
 import org.eclipse.swt.graphics.Point;
@@ -804,6 +805,36 @@ public void test_drawLine_noSingularitiesIn45DregreeRotation() {
 	}
 }
 
+@Test
+public void test_ImageGcDrawer() {
+	Image simpleImageWithGC = new Image(Display.getDefault(), 16, 16);
+	GC gc = new GC(simpleImageWithGC);
+	gc.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
+	gc.fillRectangle(simpleImageWithGC.getBounds());
+	gc.setBackground(display.getSystemColor(SWT.COLOR_BLUE));
+	gc.fillRectangle(6, 6, 4, 4);
+	gc.dispose();
+
+	ImageData simpleData = simpleImageWithGC.getImageData();
+
+	final ImageGcDrawer imageGcDrawer = (iGc, width, height) -> {
+		iGc.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
+		iGc.fillRectangle(0, 0, width, height);
+		iGc.setBackground(display.getSystemColor(SWT.COLOR_BLUE));
+		iGc.fillRectangle(6, 6, 4, 4);
+	};
+	Image imageWithGCDrawer = new Image(Display.getDefault(), imageGcDrawer, 16, 16);
+
+	ImageData gcDrawerImageData = imageWithGCDrawer.getImageData();
+
+	for (int x = 0; x < 16; x++) {
+		for (int y = 0; y < 16; y++) {
+			System.out.println("Pixel at (" + x + "," + y + ") differs : " +
+		             simpleData.getPixel(x, y) + " | " + gcDrawerImageData.getPixel(x, y));
+		}
+	}
+}
+
 /**
  * @see <a href="https://github.com/eclipse-platform/eclipse.platform.swt/issues/1288">Issue 1288</a>
  */
@@ -837,20 +868,16 @@ GC gc;
  * (16bpp or less).
  */
 RGB getRealRGB(Color color) {
-	Image colorImage = new Image(display, 10, 10);
-	GC imageGc = new GC(colorImage);
-	ImageData imageData;
-	PaletteData palette;
-	int pixel;
-
-	imageGc.setBackground(color);
-	imageGc.setForeground(color);
-	imageGc.fillRectangle(0, 0, 10, 10);
-	imageData = colorImage.getImageData();
-	palette = imageData.palette;
-	imageGc.dispose();
+	ImageGcDrawer gcDrawer = (imageGc, width, height) -> {
+		imageGc.setBackground(color);
+		imageGc.setForeground(color);
+		imageGc.fillRectangle(0, 0, width, height);
+	};
+	Image colorImage = new Image(display, gcDrawer, 10, 10);
+	ImageData imageData = colorImage.getImageData();
+	PaletteData palette = imageData.palette;
 	colorImage.dispose();
-	pixel = imageData.getPixel(0, 0);
+	int pixel = imageData.getPixel(0, 0);
 	return palette.getRGB(pixel);
 }
 
