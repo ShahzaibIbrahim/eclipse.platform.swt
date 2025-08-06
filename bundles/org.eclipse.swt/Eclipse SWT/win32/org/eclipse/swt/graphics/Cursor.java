@@ -68,24 +68,8 @@ public final class Cursor extends Resource {
 
 	private HashMap<Integer, Long> zoomLevelToHandle = new HashMap<>();
 
+	private final CursorHandleProvider cursorHandleProvider;
 	boolean isIcon;
-	private final ImageDataProvider imageDataProvider;
-	private final ImageData source;
-	private final ImageData mask;
-	private final int hotspotX;
-	private final int hotspotY;
-/**
- * Prevents uninitialized instances from being created outside the package.
- */
-Cursor(Device device) {
-	super(device);
-	this.source = null;
-	this.imageDataProvider = null;
-	this.mask = null;
-	this.hotspotX = -1;
-	this.hotspotY = -1;
-	this.device.registerResourceWithZoomSupport(this);
-}
 
 /**
  * Constructs a new cursor given a device and a style
@@ -134,42 +118,11 @@ Cursor(Device device) {
  * @see #dispose()
  */
 public Cursor(Device device, int style) {
-	this(device);
-	this.handle = setupCursorFromStyle(style);
+	super(device);
+	this.cursorHandleProvider = new StyleCursorHandleProvider(style);
+	this.handle = this.cursorHandleProvider.createHandle(this, DEFAULT_ZOOM);
 	init();
-}
-
-private static long setupCursorFromStyle(int style) {
-	long lpCursorName = 0;
-	switch (style) {
-		case SWT.CURSOR_HAND: 		lpCursorName = OS.IDC_HAND; break;
-		case SWT.CURSOR_ARROW: 		lpCursorName = OS.IDC_ARROW; break;
-		case SWT.CURSOR_WAIT: 		lpCursorName = OS.IDC_WAIT; break;
-		case SWT.CURSOR_CROSS: 		lpCursorName = OS.IDC_CROSS; break;
-		case SWT.CURSOR_APPSTARTING: 	lpCursorName = OS.IDC_APPSTARTING; break;
-		case SWT.CURSOR_HELP: 		lpCursorName = OS.IDC_HELP; break;
-		case SWT.CURSOR_SIZEALL: 	lpCursorName = OS.IDC_SIZEALL; break;
-		case SWT.CURSOR_SIZENESW: 	lpCursorName = OS.IDC_SIZENESW; break;
-		case SWT.CURSOR_SIZENS: 	lpCursorName = OS.IDC_SIZENS; break;
-		case SWT.CURSOR_SIZENWSE: 	lpCursorName = OS.IDC_SIZENWSE; break;
-		case SWT.CURSOR_SIZEWE: 	lpCursorName = OS.IDC_SIZEWE; break;
-		case SWT.CURSOR_SIZEN: 		lpCursorName = OS.IDC_SIZENS; break;
-		case SWT.CURSOR_SIZES: 		lpCursorName = OS.IDC_SIZENS; break;
-		case SWT.CURSOR_SIZEE: 		lpCursorName = OS.IDC_SIZEWE; break;
-		case SWT.CURSOR_SIZEW: 		lpCursorName = OS.IDC_SIZEWE; break;
-		case SWT.CURSOR_SIZENE: 	lpCursorName = OS.IDC_SIZENESW; break;
-		case SWT.CURSOR_SIZESE: 	lpCursorName = OS.IDC_SIZENWSE; break;
-		case SWT.CURSOR_SIZESW: 	lpCursorName = OS.IDC_SIZENESW; break;
-		case SWT.CURSOR_SIZENW: 	lpCursorName = OS.IDC_SIZENWSE; break;
-		case SWT.CURSOR_UPARROW: 	lpCursorName = OS.IDC_UPARROW; break;
-		case SWT.CURSOR_IBEAM: 		lpCursorName = OS.IDC_IBEAM; break;
-		case SWT.CURSOR_NO: 		lpCursorName = OS.IDC_NO; break;
-		default:
-			SWT.error(SWT.ERROR_INVALID_ARGUMENT);
-	}
-	long handle = OS.LoadCursor(0, lpCursorName);
-	if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
-	return handle;
+	this.device.registerResourceWithZoomSupport(this);
 }
 
 /**
@@ -207,46 +160,10 @@ private static long setupCursorFromStyle(int style) {
  */
 public Cursor(Device device, ImageData source, ImageData mask, int hotspotX, int hotspotY) {
 	super(device);
-	this.source = source;
-	this.mask = mask;
-	this.hotspotX = hotspotX;
-	this.hotspotY = hotspotY;
-	this.imageDataProvider = null;
-	this.handle = setupCursorFromImageData(source, mask, hotspotX, hotspotY);
+	this.cursorHandleProvider = new ImageDataCursorHandleProvider(source, mask, hotspotX, hotspotY);
+	this.handle = this.cursorHandleProvider.createHandle(this, DEFAULT_ZOOM);
 	init();
 	this.device.registerResourceWithZoomSupport(this);
-}
-
-private static long setupCursorFromImageData(ImageData source, ImageData mask, int hotspotX, int hotspotY) {
-	if (source == null) SWT.error(SWT.ERROR_NULL_ARGUMENT);
-	if (mask == null) {
-		if (source.getTransparencyType() != SWT.TRANSPARENCY_MASK) {
-			SWT.error(SWT.ERROR_NULL_ARGUMENT);
-		}
-		mask = source.getTransparencyMask();
-	}
-	/* Check the bounds. Mask must be the same size as source */
-	if (mask.width != source.width || mask.height != source.height) {
-		SWT.error(SWT.ERROR_INVALID_ARGUMENT);
-	}
-	/* Check the hotspots */
-	if (hotspotX >= source.width || hotspotX < 0 ||
-		hotspotY >= source.height || hotspotY < 0) {
-		SWT.error(SWT.ERROR_INVALID_ARGUMENT);
-	}
-	/* Convert depth to 1 */
-	mask = ImageData.convertMask(mask);
-	source = ImageData.convertMask(source);
-
-	/* Make sure source and mask scanline pad is 2 */
-	byte[] sourceData = ImageData.convertPad(source.data, source.width, source.height, source.depth, source.scanlinePad, 2);
-	byte[] maskData = ImageData.convertPad(mask.data, mask.width, mask.height, mask.depth, mask.scanlinePad, 2);
-
-	/* Create the cursor */
-	long hInst = OS.GetModuleHandle(null);
-	long handle = OS.CreateCursor(hInst, hotspotX, hotspotY, source.width, source.height, sourceData, maskData);
-	if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
-	return handle;
 }
 
 /**
@@ -280,89 +197,11 @@ private static long setupCursorFromImageData(ImageData source, ImageData mask, i
  */
 public Cursor(Device device, ImageData source, int hotspotX, int hotspotY) {
 	super(device);
-	this.source = source;
-	this.mask = null;
-	this.hotspotX = hotspotX;
-	this.hotspotY = hotspotY;
-	this.imageDataProvider = null;
-	this.handle = setupCursorFromImageData(device, source, hotspotX, hotspotY);
+	this.cursorHandleProvider = new ImageDataCursorHandleProvider(source, null, hotspotX, hotspotY);
 	isIcon = true;
+	this.handle = this.cursorHandleProvider.createHandle(this, DEFAULT_ZOOM);
 	init();
 	this.device.registerResourceWithZoomSupport(this);
-}
-
-private static long setupCursorFromImageData(Device device, ImageData source, int hotspotX, int hotspotY) {
-	if (source == null) SWT.error(SWT.ERROR_NULL_ARGUMENT);
-	/* Check the hotspots */
-	if (hotspotX >= source.width || hotspotX < 0 ||
-		hotspotY >= source.height || hotspotY < 0) {
-		SWT.error(SWT.ERROR_INVALID_ARGUMENT);
-	}
-	long hBitmap = 0;
-	long hMask = 0;
-	if (source.maskData == null && source.transparentPixel == -1 && (source.alpha != -1 || source.alphaData != null)) {
-		PaletteData palette = source.palette;
-		PaletteData newPalette = new PaletteData(0xFF00, 0xFF0000, 0xFF000000);
-		ImageData img = new ImageData(source.width, source.height, 32, newPalette);
-		if (palette.isDirect) {
-			ImageData.blit(
-				source.data, source.depth, source.bytesPerLine, source.getByteOrder(), source.width, source.height,    palette.redMask,    palette.greenMask,    palette.blueMask,
-				   img.data,    img.depth,    img.bytesPerLine,    img.getByteOrder(),    img.width,    img.height, newPalette.redMask, newPalette.greenMask, newPalette.blueMask,
-				false, false);
-		} else {
-			RGB[] rgbs = palette.getRGBs();
-			int length = rgbs.length;
-			byte[] srcReds = new byte[length];
-			byte[] srcGreens = new byte[length];
-			byte[] srcBlues = new byte[length];
-			for (int i = 0; i < rgbs.length; i++) {
-				RGB rgb = rgbs[i];
-				if (rgb == null) continue;
-				srcReds[i] = (byte)rgb.red;
-				srcGreens[i] = (byte)rgb.green;
-				srcBlues[i] = (byte)rgb.blue;
-			}
-			ImageData.blit(
-				source.width, source.height,
-				source.data, source.depth, source.bytesPerLine, source.getByteOrder(), srcReds, srcGreens, srcBlues,
-				   img.data,    img.depth,    img.bytesPerLine,    img.getByteOrder(), newPalette.redMask, newPalette.greenMask, newPalette.blueMask);
-		}
-		hBitmap = Image.createDIB(source.width, source.height, 32);
-		if (hBitmap == 0) SWT.error(SWT.ERROR_NO_HANDLES);
-		BITMAP dibBM = new BITMAP();
-		OS.GetObject(hBitmap, BITMAP.sizeof, dibBM);
-		byte[] srcData = img.data;
-		if (source.alpha != -1) {
-			for (int i = 3; i < srcData.length; i+=4) {
-				srcData[i] = (byte)source.alpha;
-			}
-		} else if (source.alphaData != null) {
-			for (int sp = 3, ap=0; sp < srcData.length; sp+=4, ap++) {
-				srcData[sp] = source.alphaData[ap];
-			}
-		}
-		OS.MoveMemory(dibBM.bmBits, srcData, srcData.length);
-		hMask = OS.CreateBitmap(source.width, source.height, 1, 1, new byte[(((source.width + 7) / 8) + 3) / 4 * 4 * source.height]);
-		if (hMask == 0) SWT.error(SWT.ERROR_NO_HANDLES);
-	} else {
-		ImageData mask = source.getTransparencyMask();
-		long [] result = Image.initIcon(device, source, mask);
-		hBitmap = result[0];
-		hMask = result[1];
-	}
-	/* Create the icon */
-	ICONINFO info = new ICONINFO();
-	info.fIcon = false;
-	info.hbmColor = hBitmap;
-	info.hbmMask = hMask;
-	info.xHotspot = hotspotX;
-	info.yHotspot = hotspotY;
-	long handle = OS.CreateIconIndirect(info);
-	OS.DeleteObject(hBitmap);
-	OS.DeleteObject(hMask);
-	if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
-
-	return handle;
 }
 
 /**
@@ -397,13 +236,9 @@ private static long setupCursorFromImageData(Device device, ImageData source, in
 public Cursor(Device device, ImageDataProvider imageDataProvider, int hotspotX, int hotspotY) {
 	super(device);
 	if (imageDataProvider == null) SWT.error(SWT.ERROR_NULL_ARGUMENT);
-	this.imageDataProvider = imageDataProvider;
-	this.source = imageDataProvider.getImageData(100);
-	this.mask = null;
-	this.hotspotX = hotspotX;
-	this.hotspotY = hotspotY;
-	this.handle = setupCursorFromImageData(device, this.source, hotspotX, hotspotY);
+	this.cursorHandleProvider = new ImageDataProviderCursorHandleProvider(imageDataProvider, hotspotX, hotspotY);
 	isIcon = true;
+	this.handle = this.cursorHandleProvider.createHandle(this, DEFAULT_ZOOM);
 	init();
 	this.device.registerResourceWithZoomSupport(this);
 }
@@ -431,27 +266,9 @@ public static Long win32_getHandle (Cursor cursor, int zoom) {
 		return cursor.zoomLevelToHandle.get(zoom);
 	}
 
-	if (cursor.source == null) {
-		cursor.setHandleForZoomLevel(cursor.handle, zoom);
-	} else {
-		ImageData source;
-		if (cursor.imageDataProvider != null) {
-			Image tempImage = new Image(cursor.getDevice(), cursor.imageDataProvider);
-			source = tempImage.getImageData(zoom);
-			tempImage.dispose();
-		}
-		else {
-			source = DPIUtil.scaleImageData(cursor.device, cursor.source, zoom, DEFAULT_ZOOM);
-		}
-		if (cursor.isIcon) {
-			long handle = setupCursorFromImageData(cursor.getDevice(), source, Win32DPIUtils.pointToPixel(cursor.hotspotX, zoom), Win32DPIUtils.pointToPixel(cursor.hotspotY, zoom));
-			cursor.setHandleForZoomLevel(handle, zoom);
-		} else {
-			ImageData mask = DPIUtil.scaleImageData(cursor.getDevice(), cursor.mask, zoom, DEFAULT_ZOOM);
-			long handle = setupCursorFromImageData(source, mask, Win32DPIUtils.pointToPixel(cursor.hotspotX, zoom), Win32DPIUtils.pointToPixel(cursor.hotspotY, zoom));
-			cursor.setHandleForZoomLevel(handle, zoom);
-		}
-	}
+	long handle = cursor.cursorHandleProvider.createHandle(cursor, zoom);
+	cursor.setHandleForZoomLevel(handle, zoom);
+
 	return cursor.zoomLevelToHandle.get(zoom);
 }
 
@@ -576,6 +393,222 @@ void destroyHandlesExcept(Set<Integer> zoomLevels) {
 		}
 		return false;
 	});
+}
+
+private abstract class CursorHandleProvider {
+	protected abstract long createHandle(Cursor cursor, int zoom);
+
+    protected final long createHandleFromImageData(Cursor cursor, int zoom, ImageData source, ImageData mask, int hotSpotX, int hotSpotY) {
+		long handle;
+		int scaledHotspotX = Win32DPIUtils.pointToPixel(hotSpotX, zoom);
+		int scaledHotspotY = Win32DPIUtils.pointToPixel(hotSpotY, zoom);
+		if (cursor.isIcon) {
+			handle = setupCursorFromImageData(cursor.getDevice(), source, scaledHotspotX, scaledHotspotY);
+		} else {
+			ImageData scaledMask = DPIUtil.scaleImageData(cursor.getDevice(), mask, zoom, DEFAULT_ZOOM);
+			handle = setupCursorFromImageData(source, scaledMask, scaledHotspotX, scaledHotspotY);
+		}
+		return handle;
+	}
+
+	private final long setupCursorFromImageData(Device device, ImageData source, int hotspotX, int hotspotY) {
+		if (source == null) SWT.error(SWT.ERROR_NULL_ARGUMENT);
+		/* Check the hotspots */
+		if (hotspotX >= source.width || hotspotX < 0 ||
+			hotspotY >= source.height || hotspotY < 0) {
+			SWT.error(SWT.ERROR_INVALID_ARGUMENT);
+		}
+		long hBitmap = 0;
+		long hMask = 0;
+		if (source.maskData == null && source.transparentPixel == -1 && (source.alpha != -1 || source.alphaData != null)) {
+			PaletteData palette = source.palette;
+			PaletteData newPalette = new PaletteData(0xFF00, 0xFF0000, 0xFF000000);
+			ImageData img = new ImageData(source.width, source.height, 32, newPalette);
+			if (palette.isDirect) {
+				ImageData.blit(
+					source.data, source.depth, source.bytesPerLine, source.getByteOrder(), source.width, source.height,    palette.redMask,    palette.greenMask,    palette.blueMask,
+					   img.data,    img.depth,    img.bytesPerLine,    img.getByteOrder(),    img.width,    img.height, newPalette.redMask, newPalette.greenMask, newPalette.blueMask,
+					false, false);
+			} else {
+				RGB[] rgbs = palette.getRGBs();
+				int length = rgbs.length;
+				byte[] srcReds = new byte[length];
+				byte[] srcGreens = new byte[length];
+				byte[] srcBlues = new byte[length];
+				for (int i = 0; i < rgbs.length; i++) {
+					RGB rgb = rgbs[i];
+					if (rgb == null) continue;
+					srcReds[i] = (byte)rgb.red;
+					srcGreens[i] = (byte)rgb.green;
+					srcBlues[i] = (byte)rgb.blue;
+				}
+				ImageData.blit(
+					source.width, source.height,
+					source.data, source.depth, source.bytesPerLine, source.getByteOrder(), srcReds, srcGreens, srcBlues,
+					   img.data,    img.depth,    img.bytesPerLine,    img.getByteOrder(), newPalette.redMask, newPalette.greenMask, newPalette.blueMask);
+			}
+			hBitmap = Image.createDIB(source.width, source.height, 32);
+			if (hBitmap == 0) SWT.error(SWT.ERROR_NO_HANDLES);
+			BITMAP dibBM = new BITMAP();
+			OS.GetObject(hBitmap, BITMAP.sizeof, dibBM);
+			byte[] srcData = img.data;
+			if (source.alpha != -1) {
+				for (int i = 3; i < srcData.length; i+=4) {
+					srcData[i] = (byte)source.alpha;
+				}
+			} else if (source.alphaData != null) {
+				for (int sp = 3, ap=0; sp < srcData.length; sp+=4, ap++) {
+					srcData[sp] = source.alphaData[ap];
+				}
+			}
+			OS.MoveMemory(dibBM.bmBits, srcData, srcData.length);
+			hMask = OS.CreateBitmap(source.width, source.height, 1, 1, new byte[(((source.width + 7) / 8) + 3) / 4 * 4 * source.height]);
+			if (hMask == 0) SWT.error(SWT.ERROR_NO_HANDLES);
+		} else {
+			ImageData mask = source.getTransparencyMask();
+			long [] result = Image.initIcon(device, source, mask);
+			hBitmap = result[0];
+			hMask = result[1];
+		}
+		/* Create the icon */
+		ICONINFO info = new ICONINFO();
+		info.fIcon = false;
+		info.hbmColor = hBitmap;
+		info.hbmMask = hMask;
+		info.xHotspot = hotspotX;
+		info.yHotspot = hotspotY;
+		long handle = OS.CreateIconIndirect(info);
+		OS.DeleteObject(hBitmap);
+		OS.DeleteObject(hMask);
+		if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
+
+		return handle;
+	}
+
+	private final long setupCursorFromImageData(ImageData source, ImageData mask, int hotspotX, int hotspotY) {
+		if (source == null) SWT.error(SWT.ERROR_NULL_ARGUMENT);
+		if (mask == null) {
+			if (source.getTransparencyType() != SWT.TRANSPARENCY_MASK) {
+				SWT.error(SWT.ERROR_NULL_ARGUMENT);
+			}
+			mask = source.getTransparencyMask();
+		}
+		/* Check the bounds. Mask must be the same size as source */
+		if (mask.width != source.width || mask.height != source.height) {
+			SWT.error(SWT.ERROR_INVALID_ARGUMENT);
+		}
+		/* Check the hotspots */
+		if (hotspotX >= source.width || hotspotX < 0 ||
+			hotspotY >= source.height || hotspotY < 0) {
+			SWT.error(SWT.ERROR_INVALID_ARGUMENT);
+		}
+		/* Convert depth to 1 */
+		mask = ImageData.convertMask(mask);
+		source = ImageData.convertMask(source);
+
+		/* Make sure source and mask scanline pad is 2 */
+		byte[] sourceData = ImageData.convertPad(source.data, source.width, source.height, source.depth, source.scanlinePad, 2);
+		byte[] maskData = ImageData.convertPad(mask.data, mask.width, mask.height, mask.depth, mask.scanlinePad, 2);
+
+		/* Create the cursor */
+		long hInst = OS.GetModuleHandle(null);
+		long handle = OS.CreateCursor(hInst, hotspotX, hotspotY, source.width, source.height, sourceData, maskData);
+		if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
+		return handle;
+	}
+
+}
+
+private class StyleCursorHandleProvider extends CursorHandleProvider {
+    private final int style;
+
+    public StyleCursorHandleProvider(int style) {
+        this.style = style;
+    }
+
+    @Override
+	public long createHandle(Cursor cursor, int zoom) {
+        // zoom ignored, LoadCursor handles scaling internally
+        return setupCursorFromStyle(style);
+    }
+
+    private final long setupCursorFromStyle(int style) {
+		long lpCursorName = 0;
+		switch (style) {
+			case SWT.CURSOR_HAND: 		lpCursorName = OS.IDC_HAND; break;
+			case SWT.CURSOR_ARROW: 		lpCursorName = OS.IDC_ARROW; break;
+			case SWT.CURSOR_WAIT: 		lpCursorName = OS.IDC_WAIT; break;
+			case SWT.CURSOR_CROSS: 		lpCursorName = OS.IDC_CROSS; break;
+			case SWT.CURSOR_APPSTARTING: 	lpCursorName = OS.IDC_APPSTARTING; break;
+			case SWT.CURSOR_HELP: 		lpCursorName = OS.IDC_HELP; break;
+			case SWT.CURSOR_SIZEALL: 	lpCursorName = OS.IDC_SIZEALL; break;
+			case SWT.CURSOR_SIZENESW: 	lpCursorName = OS.IDC_SIZENESW; break;
+			case SWT.CURSOR_SIZENS: 	lpCursorName = OS.IDC_SIZENS; break;
+			case SWT.CURSOR_SIZENWSE: 	lpCursorName = OS.IDC_SIZENWSE; break;
+			case SWT.CURSOR_SIZEWE: 	lpCursorName = OS.IDC_SIZEWE; break;
+			case SWT.CURSOR_SIZEN: 		lpCursorName = OS.IDC_SIZENS; break;
+			case SWT.CURSOR_SIZES: 		lpCursorName = OS.IDC_SIZENS; break;
+			case SWT.CURSOR_SIZEE: 		lpCursorName = OS.IDC_SIZEWE; break;
+			case SWT.CURSOR_SIZEW: 		lpCursorName = OS.IDC_SIZEWE; break;
+			case SWT.CURSOR_SIZENE: 	lpCursorName = OS.IDC_SIZENESW; break;
+			case SWT.CURSOR_SIZESE: 	lpCursorName = OS.IDC_SIZENWSE; break;
+			case SWT.CURSOR_SIZESW: 	lpCursorName = OS.IDC_SIZENESW; break;
+			case SWT.CURSOR_SIZENW: 	lpCursorName = OS.IDC_SIZENWSE; break;
+			case SWT.CURSOR_UPARROW: 	lpCursorName = OS.IDC_UPARROW; break;
+			case SWT.CURSOR_IBEAM: 		lpCursorName = OS.IDC_IBEAM; break;
+			case SWT.CURSOR_NO: 		lpCursorName = OS.IDC_NO; break;
+			default:
+				SWT.error(SWT.ERROR_INVALID_ARGUMENT);
+		}
+		long handle = OS.LoadCursor(0, lpCursorName);
+		if (handle == 0) SWT.error(SWT.ERROR_NO_HANDLES);
+		return handle;
+	}
+}
+
+private class ImageDataProviderCursorHandleProvider extends CursorHandleProvider {
+    private final ImageDataProvider provider;
+    private final int hotspotX;
+    private final int hotspotY;
+
+    public ImageDataProviderCursorHandleProvider(ImageDataProvider provider, int hotspotX, int hotspotY) {
+        this.provider = provider;
+        this.hotspotX = hotspotX;
+        this.hotspotY = hotspotY;
+    }
+
+    @Override
+    public long createHandle(Cursor cursor, int zoom) {
+    	Image tempImage = new Image(cursor.getDevice(), this.provider);
+		ImageData source = tempImage.getImageData(zoom);
+		tempImage.dispose();
+		long handle = createHandleFromImageData(cursor, zoom, source, null, this.hotspotX, this.hotspotY);
+
+        return handle;
+    }
+
+}
+
+private class ImageDataCursorHandleProvider extends CursorHandleProvider {
+    private final ImageData source;
+    private final ImageData mask;
+    private final int hotspotX;
+    private final int hotspotY;
+
+    public ImageDataCursorHandleProvider(ImageData source, ImageData mask, int hotspotX, int hotspotY) {
+        this.source = source;
+        this.mask = mask;
+        this.hotspotX = hotspotX;
+        this.hotspotY = hotspotY;
+    }
+
+    @Override
+    public long createHandle(Cursor cursor, int zoom) {
+    	ImageData source = DPIUtil.scaleImageData(cursor.getDevice(), this.source, zoom, DEFAULT_ZOOM);
+    	long handle = createHandleFromImageData(cursor, zoom, source, this.mask, this.hotspotX, this.hotspotY);
+
+    	return handle;
+    }
 }
 
 }
